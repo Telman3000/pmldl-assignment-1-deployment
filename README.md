@@ -21,7 +21,7 @@ Raw file: `data/raw/titanic.csv`
 │   ├── datasets/          # Stage 1
 │   ├── models/            # Stage 2
 │   └── deployment/
-│       ├── api/           # FastAPI + Dockerfile
+│       ├── api/           # FastAPI + Dockerfile (model baked into image)
 │       ├── app/           # Streamlit + Dockerfile
 │       ├── deploy.py
 │       └── docker-compose.yml
@@ -31,7 +31,9 @@ Raw file: `data/raw/titanic.csv`
 ├── models/                # packaged model (.joblib), created by pipeline
 ├── notebooks/
 ├── services/airflow/
+│   ├── Dockerfile         # Airflow + docker CLI + compose plugin
 │   ├── dags/              # Airflow DAG (every 5 minutes)
+│   ├── .env.example       # set HOST_PROJECT_DIR here
 │   └── docker-compose.yml
 ├── run_pipeline.py        # run all stages once
 ├── schedule_pipeline.py   # local 5-minute scheduler
@@ -69,6 +71,8 @@ This runs data → model → Docker deployment:
 python run_pipeline.py
 ```
 
+`deploy.py` sets `HOST_PROJECT_DIR` to the absolute repo path so Docker Compose bind mounts and build contexts work correctly.
+
 After a successful run:
 
 | Service | URL |
@@ -87,8 +91,25 @@ docker compose -f code/deployment/docker-compose.yml down
 
 ### Option A — Airflow (recommended for the assignment)
 
+1. Create `services/airflow/.env` from the example and set **your** absolute host path:
+
 ```bash
 cd services/airflow
+copy .env.example .env          # Windows
+# cp .env.example .env          # macOS / Linux
+```
+
+Edit `.env`:
+
+```env
+HOST_PROJECT_DIR=C:/Users/YOU/path/to/pmldl-assignment-1-deployment
+```
+
+`deploy.py` uses `/opt/project` as the Compose build context inside Airflow, and `HOST_PROJECT_DIR/.../models` as the host bind-mount for the model.
+
+2. Start Airflow:
+
+```bash
 docker compose up --build -d
 ```
 
@@ -96,7 +117,8 @@ docker compose up --build -d
 - Login: `admin` / `admin`  
 - DAG: `titanic_ml_pipeline` (schedule `*/5 * * * *`)
 
-The DAG tasks call the same Python stages and rebuild/restart the API + app containers.
+The custom Airflow image includes `docker` CLI and the **Compose plugin** (`docker compose`).  
+The API image also **bakes in** `models/titanic_model.joblib` at build time as a fallback.
 
 Stop Airflow:
 
@@ -122,7 +144,7 @@ python code/deployment/deploy.py
 
 ## Model note
 
-The trained model file (`models/titanic_model.joblib`) is produced by Stage 2 and is listed in `.gitignore` if you prefer not to commit binaries. Generate it by running the pipeline.
+The trained model file (`models/titanic_model.joblib`) is produced by Stage 2 and is listed in `.gitignore`. Generate it by running the pipeline before the first Docker build (required because the API Dockerfile copies the model into the image).
 
 MLflow metrics/artifacts are stored under `mlruns/`.
 

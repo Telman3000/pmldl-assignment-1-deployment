@@ -27,11 +27,14 @@ def load_raw_data(path: Path = RAW_PATH) -> pd.DataFrame:
 
 
 def remove_outliers_iqr(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Drop outliers with the 1.5·IQR rule. Skip columns where IQR is 0."""
     cleaned = df.copy()
     for column in columns:
         q1 = cleaned[column].quantile(0.25)
         q3 = cleaned[column].quantile(0.75)
         iqr = q3 - q1
+        if iqr == 0:
+            continue
         lower = q1 - 1.5 * iqr
         upper = q3 + 1.5 * iqr
         cleaned = cleaned[(cleaned[column] >= lower) & (cleaned[column] <= upper)]
@@ -53,8 +56,9 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     # Drop any remaining missing rows (should be rare)
     data = data.dropna(subset=FEATURE_COLUMNS + [TARGET_COLUMN])
 
-    # Remove outliers on numeric columns
-    data = remove_outliers_iqr(data, ["Age", "Fare", "SibSp", "Parch"])
+    # IQR only on continuous columns. SibSp/Parch are discrete counts;
+    # applying IQR there (esp. when IQR=0 for Parch) wipes useful signal.
+    data = remove_outliers_iqr(data, ["Age", "Fare"])
 
     return data.reset_index(drop=True)
 

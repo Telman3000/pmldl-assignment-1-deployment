@@ -1,0 +1,12 @@
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+mlruns/
+services/airflow/logs/
+.git/
+*.md
+notebooks/
+data/processed/
+.pytest_cache/

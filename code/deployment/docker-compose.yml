@@ -1,22 +1,30 @@
+# COMPOSE_BUILD_CONTEXT: path readable by the Compose *client*
+#   - on the host: absolute repo path (C:/...)
+#   - in Airflow:  /opt/project  (project bind-mounted into the container)
+# HOST_MODELS_DIR: path as seen by the Docker *daemon* on the host
+#   (used for the models bind mount)
 services:
   api:
     build:
-      context: ./api
+      context: ${COMPOSE_BUILD_CONTEXT}
+      dockerfile: code/deployment/api/Dockerfile
     container_name: titanic-api
     ports:
       - "8000:8000"
     volumes:
-      - ../../models:/app/models:ro
+      - ${HOST_MODELS_DIR}:/app/models:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 20s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   app:
     build:
-      context: ./app
+      context: ${COMPOSE_BUILD_CONTEXT}/code/deployment/app
+      dockerfile: Dockerfile
     container_name: titanic-app
     ports:
       - "8501:8501"

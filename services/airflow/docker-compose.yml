@@ -1,9 +1,13 @@
 # Airflow in Docker for the automated Titanic MLOps pipeline.
-# Project code is mounted at /opt/project. Docker socket is mounted so the
-# deployment task can rebuild/restart API and app containers.
+#
+# Required: copy .env.example -> .env and set HOST_PROJECT_DIR to the
+# absolute path of this repository on the Docker HOST (Windows/macOS/Linux).
+# That path is used for bind mounts and for building API/app images via DooD.
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.3-python3.11
+  build:
+    context: .
+    dockerfile: Dockerfile
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -11,11 +15,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-    _PIP_ADDITIONAL_REQUIREMENTS: pandas==2.2.3 scikit-learn==1.5.2 mlflow==2.19.0 joblib==1.4.2
+    # Absolute host path of the repo (see .env). Used by deploy.py / compose.
+    HOST_PROJECT_DIR: ${HOST_PROJECT_DIR}
   volumes:
     - ./dags:/opt/airflow/dags
     - ./logs:/opt/airflow/logs
-    - ../../:/opt/project
+    - ${HOST_PROJECT_DIR}:/opt/project
     - /var/run/docker.sock:/var/run/docker.sock
   user: "0:0"
   depends_on:
@@ -44,7 +49,6 @@ services:
     command:
       - -c
       - |
-        apt-get update && apt-get install -y --no-install-recommends docker.io
         airflow db migrate
         airflow users create \
           --username admin \
@@ -59,7 +63,7 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    command: bash -c "apt-get update && apt-get install -y --no-install-recommends docker.io && airflow webserver"
+    command: airflow webserver
     ports:
       - "8080:8080"
     healthcheck:
@@ -77,7 +81,7 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
-    command: bash -c "apt-get update && apt-get install -y --no-install-recommends docker.io && airflow scheduler"
+    command: airflow scheduler
     restart: unless-stopped
     depends_on:
       airflow-init:
