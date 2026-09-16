@@ -71,7 +71,7 @@ This runs data → model → Docker deployment:
 python run_pipeline.py
 ```
 
-`deploy.py` sets `HOST_PROJECT_DIR` to the absolute repo path so Docker Compose bind mounts and build contexts work correctly.
+`deploy.py` sets `COMPOSE_BUILD_CONTEXT` so Docker Compose can build API/app images (model is baked into the API image; no models bind-mount).
 
 After a successful run:
 
@@ -105,7 +105,7 @@ Edit `.env`:
 HOST_PROJECT_DIR=C:/Users/YOU/path/to/pmldl-assignment-1-deployment
 ```
 
-`deploy.py` uses `/opt/project` as the Compose build context inside Airflow, and `HOST_PROJECT_DIR/.../models` as the host bind-mount for the model.
+`deploy.py` uses `/opt/project` as the Compose build context inside Airflow so the API Dockerfile can `COPY` the freshly trained model into the image. There is **no** models bind-mount (that breaks DooD on Docker Desktop with Windows host paths).
 
 2. Start Airflow:
 
@@ -118,7 +118,7 @@ docker compose up --build -d
 - DAG: `titanic_ml_pipeline` (schedule `*/5 * * * *`)
 
 The custom Airflow image includes `docker` CLI and the **Compose plugin** (`docker compose`).  
-The API image also **bakes in** `models/titanic_model.joblib` at build time as a fallback.
+The API image **bakes in** `models/titanic_model.joblib` at build time (source of truth for serving).
 
 Stop Airflow:
 
